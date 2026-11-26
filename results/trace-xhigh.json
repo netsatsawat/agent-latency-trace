@@ -1,0 +1,97 @@
+{
+ "run": 1,
+ "effort": "xhigh",
+ "total_s": 11.0619,
+ "steps": [
+  {
+   "step": 1,
+   "sent_s": 0.0,
+   "first_token_s": 1.4912,
+   "reading_and_queue_s": 1.491,
+   "thinking_s": 0,
+   "writing_s": 0.0,
+   "done_s": 1.509,
+   "reasoning_tokens": 0,
+   "visible_tokens": 51,
+   "cached_tokens": 1484,
+   "input_tokens": 1487,
+   "tools": [
+    "read_file",
+    "read_file"
+   ],
+   "tool_spans": [
+    [
+     "read_file",
+     1.5383,
+     1.5398
+    ],
+    [
+     "read_file",
+     1.5393,
+     1.5398
+    ]
+   ]
+  },
+  {
+   "step": 2,
+   "sent_s": 1.5399,
+   "first_token_s": 2.8982,
+   "reading_and_queue_s": 1.465,
+   "thinking_s": 1.434,
+   "writing_s": 3.954,
+   "done_s": 6.87,
+   "reasoning_tokens": 144,
+   "visible_tokens": 398,
+   "cached_tokens": 2000,
+   "input_tokens": 2003,
+   "tools": [
+    "edit_file"
+   ],
+   "tool_spans": [
+    [
+     "edit_file",
+     8.4295,
+     8.4305
+    ]
+   ]
+  },
+  {
+   "step": 3,
+   "sent_s": 8.4305,
+   "first_token_s": 0.8906,
+   "reading_and_queue_s": 0.891,
+   "thinking_s": 0,
+   "writing_s": 0.031,
+   "done_s": 0.932,
+   "reasoning_tokens": 0,
+   "visible_tokens": 14,
+   "cached_tokens": 2000,
+   "input_tokens": 2560,
+   "tools": [
+    "run_tests"
+   ],
+   "tool_spans": [
+    [
+     "run_tests",
+     9.3992,
+     9.4478
+    ]
+   ]
+  },
+  {
+   "step": 4,
+   "sent_s": 9.4479,
+   "first_token_s": 1.1345,
+   "reading_and_queue_s": 1.135,
+   "thinking_s": 0,
+   "writing_s": 0.446,
+   "done_s": 1.586,
+   "reasoning_tokens": 0,
+   "visible_tokens": 42,
+   "cached_tokens": 2557,
+   "input_tokens": 2599,
+   "tools": [],
+   "tool_spans": []
+  }
+ ]
+}

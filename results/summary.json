@@ -1,0 +1,140 @@
+{
+ "source_files": [
+  "2026-11-26-gpt-6.2-sol-checkout.jsonl"
+ ],
+ "task": "checkout",
+ "model": "gpt-6.2-sol",
+ "prices_per_mtok": {
+  "input": 2.5,
+  "cached": 0.1,
+  "output": 10.0
+ },
+ "runs": 20,
+ "by_effort": {
+  "medium": {
+   "runs": 10,
+   "succeeded": 10,
+   "task_time_s": {
+    "n": 10,
+    "median": 9.262,
+    "lo": 9.013,
+    "hi": 9.905
+   },
+   "model_calls": {
+    "n": 10,
+    "median": 5.0,
+    "lo": 4.0,
+    "hi": 5.5
+   },
+   "first_token_s_per_call": {
+    "n": 48,
+    "median": 1.081,
+    "lo": 1.047,
+    "hi": 1.176
+   },
+   "first_token_s_first_call": {
+    "n": 10,
+    "median": 1.593,
+    "lo": 1.523,
+    "hi": 1.821
+   },
+   "writing_speed_tok_s": {
+    "n": 28,
+    "median": 94.798,
+    "lo": 89.609,
+    "hi": 104.545
+   },
+   "reasoning_tokens_per_run": {
+    "n": 10,
+    "median": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "visible_tokens_per_run": {
+    "n": 10,
+    "median": 337.5,
+    "lo": 313.0,
+    "hi": 502.0
+   },
+   "cache_hit_rate_after_first_call": 0.988,
+   "share_of_task_time": {
+    "waiting_for_first_token_s": 0.609,
+    "writing_s": 0.368,
+    "tools_s": 0.006
+   },
+   "cost_usd_per_run": 0.00492
+  },
+  "xhigh": {
+   "runs": 10,
+   "succeeded": 10,
+   "task_time_s": {
+    "n": 10,
+    "median": 11.239,
+    "lo": 10.918,
+    "hi": 11.761
+   },
+   "model_calls": {
+    "n": 10,
+    "median": 4.0,
+    "lo": 4.0,
+    "hi": 4.0
+   },
+   "first_token_s_per_call": {
+    "n": 40,
+    "median": 1.339,
+    "lo": 1.055,
+    "hi": 1.554
+   },
+   "first_token_s_first_call": {
+    "n": 10,
+    "median": 1.535,
+    "lo": 1.463,
+    "hi": 1.579
+   },
+   "writing_speed_tok_s": {
+    "n": 20,
+    "median": 100.451,
+    "lo": 82.631,
+    "hi": 104.571
+   },
+   "reasoning_tokens_per_run": {
+    "n": 10,
+    "median": 137.0,
+    "lo": 116.0,
+    "hi": 183.0
+   },
+   "visible_tokens_per_run": {
+    "n": 10,
+    "median": 505.0,
+    "lo": 498.0,
+    "hi": 505.0
+   },
+   "cache_hit_rate_after_first_call": 0.915,
+   "share_of_task_time": {
+    "waiting_for_first_token_s": 0.602,
+    "writing_s": 0.381,
+    "tools_s": 0.005
+   },
+   "cost_usd_per_run": 0.0087
+  }
+ },
+ "paired_task_time_s": {
+  "difference": "xhigh minus medium",
+  "n": 10,
+  "median": 1.96,
+  "lo": 0.829,
+  "hi": 2.587,
+  "pairs_where_xhigh_was_slower": 10
+ },
+ "first_token_vs_reasoning_tokens": {
+  "n": 68,
+  "intercept_s": 1.0588,
+  "s_per_token": 0.015121,
+  "calls_with_reasoning": 10,
+  "s_per_token_lo": 0.01382,
+  "s_per_token_hi": 0.016728,
+  "implied_thinking_speed_tok_s": 66.1,
+  "implied_speed_lo": 59.8,
+  "implied_speed_hi": 72.4
+ }
+}

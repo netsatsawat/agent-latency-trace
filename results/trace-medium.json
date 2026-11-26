@@ -1,0 +1,120 @@
+{
+ "run": 3,
+ "effort": "medium",
+ "total_s": 9.2591,
+ "steps": [
+  {
+   "step": 1,
+   "sent_s": 0.0,
+   "first_token_s": 1.523,
+   "reading_and_queue_s": 1.523,
+   "thinking_s": 0,
+   "writing_s": 0.001,
+   "done_s": 1.529,
+   "reasoning_tokens": 0,
+   "visible_tokens": 51,
+   "cached_tokens": 1484,
+   "input_tokens": 1487,
+   "tools": [
+    "read_file",
+    "read_file"
+   ],
+   "tool_spans": [
+    [
+     "read_file",
+     1.5632,
+     1.5645
+    ],
+    [
+     "read_file",
+     1.5635,
+     1.5647
+    ]
+   ]
+  },
+  {
+   "step": 2,
+   "sent_s": 1.5648,
+   "first_token_s": 1.2298,
+   "reading_and_queue_s": 1.23,
+   "thinking_s": 0,
+   "writing_s": 1.514,
+   "done_s": 2.752,
+   "reasoning_tokens": 0,
+   "visible_tokens": 152,
+   "cached_tokens": 2000,
+   "input_tokens": 2003,
+   "tools": [
+    "edit_file"
+   ],
+   "tool_spans": [
+    [
+     "edit_file",
+     4.3511,
+     4.3517
+    ]
+   ]
+  },
+  {
+   "step": 3,
+   "sent_s": 4.3518,
+   "first_token_s": 1.209,
+   "reading_and_queue_s": 1.209,
+   "thinking_s": 0,
+   "writing_s": 0.683,
+   "done_s": 1.898,
+   "reasoning_tokens": 0,
+   "visible_tokens": 77,
+   "cached_tokens": 2167,
+   "input_tokens": 2170,
+   "tools": [
+    "edit_file"
+   ],
+   "tool_spans": [
+    [
+     "edit_file",
+     6.2877,
+     6.2892
+    ]
+   ]
+  },
+  {
+   "step": 4,
+   "sent_s": 6.2893,
+   "first_token_s": 1.1139,
+   "reading_and_queue_s": 1.114,
+   "thinking_s": 0,
+   "writing_s": 0.025,
+   "done_s": 1.145,
+   "reasoning_tokens": 0,
+   "visible_tokens": 14,
+   "cached_tokens": 2167,
+   "input_tokens": 2262,
+   "tools": [
+    "run_tests"
+   ],
+   "tool_spans": [
+    [
+     "run_tests",
+     7.4575,
+     7.5145
+    ]
+   ]
+  },
+  {
+   "step": 5,
+   "sent_s": 7.5146,
+   "first_token_s": 1.1427,
+   "reading_and_queue_s": 1.143,
+   "thinking_s": 0,
+   "writing_s": 0.585,
+   "done_s": 1.733,
+   "reasoning_tokens": 0,
+   "visible_tokens": 43,
+   "cached_tokens": 2259,
+   "input_tokens": 2301,
+   "tools": [],
+   "tool_spans": []
+  }
+ ]
+}

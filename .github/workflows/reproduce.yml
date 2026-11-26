@@ -1,0 +1,23 @@
+name: reproduce
+
+# Recomputes every number in results/ from the raw runs in data/raw/ and fails if any of them
+# changed. It never calls the API, so it needs no key and costs nothing.
+on:
+  push:
+  pull_request:
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Tests
+        run: python -m unittest discover -s tests -v
+      - name: Results match the raw runs
+        run: python analyze.py --check
