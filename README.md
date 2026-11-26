@@ -10,7 +10,8 @@ when every streamed event arrived, how many tokens the model read, thought and w
 of the prompt came from the cache, and how long each tool took. The data behind every table
 below is in `data/raw/`, and `make check` rebuilds the tables from it.
 
-Companion to the article *Why Is Your AI Agent So Slow?* on [Medium](https://medium.com/@net_satsawat).
+Companion to the article *Why Is Your AI Agent So Slow?*, to be published soon on
+[Medium](https://medium.com/@net_satsawat).
 
 ![One agent task drawn as a trace: You, Model and Tool lanes on a time axis](docs/trace.gif)
 
