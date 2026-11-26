@@ -15,7 +15,7 @@ Companion to the article *Why Is Your AI Agent So Slow?*, to be published soon o
 
 ![One agent task drawn as a trace: You, Model and Tool lanes on a time axis](docs/trace.gif)
 
-*The median run at xhigh effort, as a trace. The width of each block is its time.*
+*A run from the middle of the 10 at xhigh effort, as a trace. The width of each block is its time.*
 
 ## What it found
 
