@@ -144,8 +144,8 @@ see why.
   coding agents on self-hosted models.
 - 10 runs per effort level. The intervals above say how much that matters for each number.
 - The tools are local and fast. Tools that call a network will change the shares.
-- The thinking time in the GIF is an estimate from reasoning tokens and the measured writing
-  speed, because the API does not report it.
+- The thinking time in the GIF is an estimate: the extra wait for the first token over a call
+  that did not think. The API does not report it.
 - Costs are estimates from list prices on 26 November 2026, not from the bill.
 
 ## License

@@ -119,18 +119,22 @@ def run_metrics(run: dict) -> dict:
     }
 
 
-def trace(run: dict, speed: float) -> dict:
+def trace(run: dict, base_wait: float) -> dict:
     """Lay one run out as segments for the GIF: the wait, thinking, writing and tools.
 
-    The thinking segment is an estimate: reasoning tokens divided by the writing speed,
-    the method the article describes. The API sends the reasoning item only once the
-    thinking is over, so the stream gives no start time for it.
+    The thinking segment is an estimate. The API sends the reasoning item only once the
+    thinking is over, so the stream gives no start time for it. A call that thought is
+    taken to have waited `base_wait` like any other call, plus its thinking, so the
+    thinking is the extra wait. `base_wait` is the intercept of the fit in
+    thinking_fit(): the usual wait for the first token when the model does not think.
+    Dividing reasoning tokens by the writing speed would undercount it here, because
+    thinking ran slower per token than writing.
     """
     steps = []
     for c in run["call_metrics"]:
         think = 0
         if c["reasoning_tokens"]:
-            think = min(c["reasoning_tokens"] / speed, c["first_token_s"])
+            think = min(max(c["first_token_s"] - base_wait, 0), c["first_token_s"])
         steps.append({
             "step": c["step"], "sent_s": c["sent_s"], "first_token_s": c["first_token_s"],
             "reading_and_queue_s": round(c["first_token_s"] - think, 3),
@@ -216,6 +220,12 @@ def analyse(raw_files: list) -> tuple[dict, dict, str]:
         "source_files": [f.name for f in raw_files], **meta, "runs": len(runs),
         "by_effort": {},
     }
+    # The usual first-token wait with no thinking, for the traces. This point fit takes no
+    # random draws, so it leaves the bootstrap intervals below unchanged.
+    later = [c for m in metrics for c in m["call_metrics"] if c["step"] > 1]
+    base_wait = fit_line(
+        [c["reasoning_tokens"] for c in later], [c["first_token_s"] for c in later]
+    )["intercept_s"]
     traces = {}
     for effort in efforts:
         ms = [m for m in metrics if m["effort"] == effort]
@@ -223,8 +233,7 @@ def analyse(raw_files: list) -> tuple[dict, dict, str]:
         # The run with the median task time goes to the GIF. With an even number of runs
         # it is the lower of the two middle ones.
         ordered = sorted(ms, key=lambda m: m["total_s"])
-        speed = summary["by_effort"][effort]["writing_speed_tok_s"]["median"]
-        traces[effort] = trace(ordered[(len(ordered) - 1) // 2], speed)
+        traces[effort] = trace(ordered[(len(ordered) - 1) // 2], base_wait)
     if len(efforts) == 2:
         a, b = efforts
         pairs = {}
