@@ -2,8 +2,10 @@ name: reproduce
 
 # Recomputes every number in results/ from the raw runs in data/raw/ and fails if any of them
 # changed. It never calls the API, so it needs no key and costs nothing.
+# Pushes to main and pull requests only, so a push to a PR branch starts one run, not two.
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
