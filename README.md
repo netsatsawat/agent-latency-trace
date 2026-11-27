@@ -4,8 +4,8 @@
 tell you where the seconds go. This repo times a real agent one model call at a time. You
 can check every number from the raw logs, with no API key.**
 
-It runs a small coding agent on OpenAI's Responses API. The agent fixes a broken checkout
-function with 3 tools: read a file, edit a file, run the tests. For each model call it records
+It runs a small coding agent on OpenAI's Responses API. The agent fixes 3 broken functions
+in a small checkout module. It has 3 tools: read a file, edit a file, run the tests. For each model call it records
 when every streamed event arrived, how many tokens the model read, thought and wrote, how much
 of the prompt came from the cache, and how long each tool took. The data behind every table
 below is in `data/raw/`, and `make check` rebuilds the tables from it.
