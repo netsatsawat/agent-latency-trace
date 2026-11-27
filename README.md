@@ -20,8 +20,9 @@ Companion to the article *Why Is Your AI Agent So Slow?*, to be published soon o
 ## What it found
 
 GPT-6.2 Sol, 10 runs at medium effort and 10 at xhigh, run one after the other on
-26 November 2026 from one laptop over the public API. Every run passed the tests. Medians, with
-95 percent bootstrap intervals in brackets:
+26 November 2026 from one laptop over the public API. Every run passed the tests. Medians,
+with 95 percent bootstrap intervals in brackets. The 3 share rows are totals over the 10
+runs.
 
 | | medium | xhigh |
 |---|---|---|
@@ -37,22 +38,24 @@ GPT-6.2 Sol, 10 runs at medium effort and 10 at xhigh, run one after the other o
 
 The full table, generated from the logs, is [results/summary.md](results/summary.md).
 
-**1. Most of the time went to waiting for each call's first token.** Every call waited about
-1.1 s before anything came back, and a task made 4 to 6 calls. Each call then wrote only 14 to
-398 visible tokens, so the fixed wait outweighed the writing: about 60 percent of the task
-against just under 40 for writing. For a task made of short steps, the number of calls is the lever. Ask the model for
-independent tools in one step, which this agent already allows.
+**1. Most of the time went to waiting for each call's first token.** A call with no
+thinking waited about 1.1 s before anything came back, and a task made 4 to 6 calls. Each
+call then wrote only 14 to 398 visible tokens, so the waits outweighed the writing: about
+60 percent of the task, thinking included, against about 40 for writing. At xhigh, about a
+third of that wait was thinking, by the estimate in point 3. For a task made of short
+steps, cut the number of calls. Ask the model for independent tool calls in one step, as
+this agent's system prompt does.
 
 **2. More effort made the task slower, even with fewer calls.** At xhigh the model planned one
 bigger edit and finished in 4 calls instead of 5, but it was slower in all 10 paired runs, by
 2.0 s at the median (0.8 to 2.6). At medium it did not think at all on this task. Raise the
 effort only where a measured gain in passed tasks pays for the seconds.
 
-**3. Thinking is hidden inside the wait, and it was slower per token than writing.** The API
-sends no thinking text and no start time for it. Fitting the wait for the first token against
-the reasoning tokens in the usage data gives about 15 ms per reasoning token, about 66 tokens a
-second (60 to 72), against about 95 to 100 for visible writing. Only 10 calls had any reasoning, so
-treat that number as rough.
+**3. Thinking is hidden inside the wait, and it was slower per token than writing.** The
+API sends no thinking text and no start time for it. Each reasoning token added about
+15 ms to the wait, by a straight-line fit of the wait against the reasoning tokens in the
+usage data. That is about 66 tokens a second (60 to 72), against about 95 to 100 for
+visible writing. Only 10 calls had any reasoning, so treat that number as rough.
 
 **4. Where the system prompt goes decides whether it is cached.** The first pilot sent it in the
 top-level `instructions` field and got 0 cached tokens on every call. OpenAI's prompt caching
@@ -68,9 +71,12 @@ milliseconds. Real tools that call a network or a database will take a bigger sh
 Each call is sent, waits, then streams. The script keeps the time of every event and the
 `usage` block the API returns. [analyze.py](analyze.py) turns those into:
 
-- **wait for the first token:** from sending the request to the first visible output, text or the
-  start of a tool call. It covers the network, the provider's queue, reading the part of the
-  prompt that is not cached, and any hidden thinking.
+- **wait for the first token:** from sending the request to the first visible output, text
+  or the start of a tool call. It covers the network, the provider's queue, reading the
+  part of the prompt that is not cached, and any hidden thinking. When the model asked for
+  2 tools in one call, both calls arrived in one piece, so their writing counts as wait.
+  By an estimate of 51 tokens at about 98 a second, that adds about 0.5 s to each run's
+  first call, about 5 percent of the task.
 - **reasoning tokens:** `usage.output_tokens_details.reasoning_tokens`. The model thinks before
   its first visible token, so this time sits inside the wait.
 - **writing speed:** visible tokens (output tokens minus reasoning tokens) divided by the time

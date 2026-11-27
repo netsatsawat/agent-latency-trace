@@ -127,7 +127,16 @@
   "pairs_where_xhigh_was_slower": 10
  },
  "all_runs": {
-  "calls_left_out": 0
+  "model_calls_per_run": {
+   "min": 4,
+   "max": 6
+  },
+  "visible_tokens_per_call": {
+   "min": 14,
+   "max": 398
+  },
+  "calls_left_out": 0,
+  "cost_usd_total": 0.13956
  },
  "first_token_vs_reasoning_tokens": {
   "n": 68,

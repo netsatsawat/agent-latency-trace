@@ -122,6 +122,7 @@ class TestCallsThatCannotBeTimed(TempRuns):
         self.assertEqual(e["succeeded"], 1)
         self.assertEqual(e["first_token_s_per_call"]["n"], 4)
         self.assertEqual(summary["all_runs"]["calls_left_out"], 1)
+        self.assertEqual(summary["all_runs"]["model_calls_per_run"]["max"], 3)
         self.assertIn("API error", md)
 
     def test_a_failed_call_with_no_visible_output_is_left_out(self):
