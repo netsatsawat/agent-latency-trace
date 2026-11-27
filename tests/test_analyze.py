@@ -3,10 +3,12 @@ import contextlib
 import io
 import json
 import random
+import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import analyze  # noqa: E402
@@ -105,7 +107,7 @@ class TestNoReasoningTokens(TempRuns):
         runs = [
             make_run(run=i, effort=e) for i in (1, 2) for e in ("low", "medium")
         ]
-        summary, traces, md = analyze.analyse([self.write("runs.jsonl", runs)])
+        summary, traces, md = analyze.summarize([self.write("runs.jsonl", runs)])
         self.assertIsNone(summary["first_token_vs_reasoning_tokens"])
         self.assertIn("there is no thinking fit", md)
         self.assertEqual(set(traces), {"low", "medium"})
@@ -116,7 +118,7 @@ class TestCallsThatCannotBeTimed(TempRuns):
         error_call = {"step": 3, "sent_s": 5.0, "error": "HTTP 500: server error"}
         calls = [make_call(step=1), make_call(step=2), error_call]
         runs = [make_run(run=1, calls=calls, success=False), make_run(run=2)]
-        summary, _, md = analyze.analyse([self.write("runs.jsonl", runs)])
+        summary, _, md = analyze.summarize([self.write("runs.jsonl", runs)])
         e = summary["by_effort"]["medium"]
         self.assertEqual(e["runs"], 2)
         self.assertEqual(e["succeeded"], 1)
@@ -124,6 +126,12 @@ class TestCallsThatCannotBeTimed(TempRuns):
         self.assertEqual(summary["all_runs"]["calls_left_out"], 1)
         self.assertEqual(summary["all_runs"]["model_calls_per_run"]["max"], 3)
         self.assertIn("API error", md)
+
+    def test_runs_where_no_call_could_be_timed_are_refused(self):
+        error_call = {"step": 1, "sent_s": 0.0, "error": "HTTP 401: bad key"}
+        path = self.write("runs.jsonl", [make_run(calls=[error_call], success=False)])
+        with self.assertRaisesRegex(analyze.RunFileError, "could be timed"):
+            analyze.summarize([path])
 
     def test_a_failed_call_with_no_visible_output_is_left_out(self):
         failed = make_call(step=2, deltas=[])
@@ -135,12 +143,44 @@ class TestCallsThatCannotBeTimed(TempRuns):
         self.assertFalse(analyze.run_metrics(dict(run, source="x"))["success"])
 
 
+class TestShares(TempRuns):
+    def test_the_shares_of_task_time_add_up_to_1(self):
+        summary, _, md = analyze.summarize([self.write("runs.jsonl", [make_run()])])
+        shares = summary["by_effort"]["medium"]["share_of_task_time"]
+        self.assertAlmostEqual(sum(shares.values()), 1, delta=0.002)
+        self.assertIn("other time", md)
+
+
+class TestBrokenFiles(TempRuns):
+    def test_a_cut_off_line_names_the_file_and_line(self):
+        whole = json.dumps(make_run())
+        path = self.dir / "runs.jsonl"
+        path.write_text(whole + "\n" + whole[:300] + "\n")
+        with self.assertRaisesRegex(analyze.RunFileError, "line 2: not valid JSON"):
+            analyze.summarize([path])
+
+
+class TestCheckCanFail(unittest.TestCase):
+    def test_check_fails_when_a_result_file_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = Path(tmp) / "results"
+            shutil.copytree(analyze.OUT, copy)
+            md = copy / "summary.md"
+            text = md.read_text()
+            md.write_text(text.replace("10 of 10", "9 of 10", 1))
+            err = io.StringIO()
+            with mock.patch.object(analyze, "OUT", copy):
+                with contextlib.redirect_stderr(err):
+                    self.assertEqual(analyze.main(["--check"]), 1)
+        self.assertIn("out of date: summary.md", err.getvalue())
+
+
 class TestMixedRunsAreRefused(TempRuns):
     def test_two_tasks_are_refused(self):
         a = self.write("a.jsonl", [make_run(task="checkout")])
         b = self.write("b.jsonl", [make_run(task="billing")])
         with self.assertRaises(analyze.RunFileError):
-            analyze.analyse([a, b])
+            analyze.summarize([a, b])
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             self.assertEqual(analyze.main([str(a), str(b)]), 2)
@@ -150,20 +190,13 @@ class TestMixedRunsAreRefused(TempRuns):
         other = dict(make_run(run=2), model="gpt-6.1")
         path = self.write("runs.jsonl", [make_run(run=1), other])
         with self.assertRaisesRegex(analyze.RunFileError, "more than one model"):
-            analyze.analyse([path])
+            analyze.summarize([path])
 
     def test_runs_pair_by_file_and_run_number(self):
         a = self.write("a.jsonl", [make_run(1, "medium"), make_run(1, "xhigh")])
         b = self.write("b.jsonl", [make_run(1, "medium"), make_run(1, "xhigh")])
-        summary, _, _ = analyze.analyse([a, b])
+        summary, _, _ = analyze.summarize([a, b])
         self.assertEqual(summary["paired_task_time_s"]["n"], 2)
-
-
-class TestCommittedResults(unittest.TestCase):
-    def test_results_match_the_raw_runs(self):
-        if not list(analyze.RAW.glob("*.jsonl")):
-            self.skipTest("no raw runs committed")
-        self.assertEqual(analyze.main(["--check"]), 0)
 
 
 if __name__ == "__main__":

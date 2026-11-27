@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use these runs or this script, please cite it as below."
+title: "agent-latency-trace"
+authors:
+  - family-names: Natakarnkitkul
+    given-names: Satsawat
+type: software
+version: 1.0.0
+date-released: 2026-11-27
+license: MIT
+repository-code: "https://github.com/netsatsawat/agent-latency-trace"
