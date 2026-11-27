@@ -253,6 +253,10 @@ def run_agent(
         })
         calls.append(call)
         items.extend(output)
+        if call["status"] != "completed":
+            # A failed or cut-off response is an API error, not an answer.
+            stop = "api_error"
+            break
         fn_calls = [o for o in output if o.get("type") == "function_call"]
         if not fn_calls:
             stop = "answered"

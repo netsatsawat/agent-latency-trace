@@ -114,7 +114,8 @@ and where you run from. Time your own agent before you change it.
 
 Each time you run the script, it writes a new file in `data/raw/`. `analyze.py` reads
 every file there, so pass your own file to keep your runs apart from these 20:
-`python3 analyze.py data/raw/<your file>`. If you change `--model`, also pass its prices
+`python3 analyze.py data/raw/<your file>`. It writes the tables to `out/<your file>/`,
+so the committed `results/` stay as they are. If you change `--model`, also pass its prices
 with `--price-input`, `--price-cached` and `--price-output`, in US dollars per million
 tokens. The defaults are GPT-6.2 Sol's.
 

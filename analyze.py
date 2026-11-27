@@ -1,7 +1,7 @@
 """Turn the raw runs in data/raw/ into the numbers in results/.
 
     python3 analyze.py             # reads every file in data/raw/, writes results/
-    python3 analyze.py FILE [...]  # reads only these run files
+    python3 analyze.py FILE [...]  # reads only these run files, writes out/<first file>/
     python3 analyze.py --check     # fails if results/ no longer matches the raw runs
 
 Every number in results/ comes from this file. The README and the article quote the
@@ -226,9 +226,9 @@ def thinking_fit(calls: list, rng: random.Random) -> dict | None:
     """Does thinking take about as long per token as writing?
 
     Fit the wait for the first token against reasoning tokens, over every call after the
-    first. The first call is cached too (1484 of 1487 tokens). It is left out because its
-    2 tool calls arrive in one piece, so its wait includes their writing. It is also the
-    first call on a new connection. Bootstrap the calls for an interval.
+    first. In the committed runs the first call was cached too (1484 of 1487 tokens), but
+    its 2 tool calls arrived in one piece, so its wait includes their writing. It is also
+    the first call on a new connection. Bootstrap the calls for an interval.
 
     Returns None when no call after the first had reasoning tokens.
     """
@@ -277,12 +277,12 @@ def load_runs(raw_files: list) -> list:
                 runs.append(dict(json.loads(line), source=display_path(f)))
     if not runs:
         raise RunFileError("The run files hold no runs.")
-    for key in ("task", "model"):
-        values = sorted({str(r.get(key, "not recorded")) for r in runs})
+    for key in ("task", "model", "prices_per_mtok"):
+        values = sorted({json.dumps(r.get(key, "not recorded")) for r in runs})
         if len(values) > 1:
             raise RunFileError(
                 f"These runs mix more than one {key}: {', '.join(values)}. Pass the "
-                "files for one task and one model."
+                "files for one task, one model and one set of prices."
             )
     return runs
 
@@ -460,20 +460,24 @@ def main(argv=None) -> int:
     outputs = {"summary.json": json.dumps(summary, indent=1) + "\n", "summary.md": md}
     for effort, t in traces.items():
         outputs[f"trace-{effort}.json"] = json.dumps(t, indent=1) + "\n"
+    # Your own run files get their own folder, so the committed results/ stay as they are.
+    out = OUT if not args.files else ROOT / "out" / args.files[0].stem
+    where = display_path(out) + "/"
     if args.check:
         stale = [
             name for name, text in outputs.items()
-            if not (OUT / name).exists() or (OUT / name).read_text() != text
+            if not (out / name).exists() or (out / name).read_text() != text
         ]
         if stale:
-            print("results/ is out of date: " + ", ".join(stale), file=sys.stderr)
+            print(f"{where} is out of date: " + ", ".join(stale), file=sys.stderr)
             return 1
-        print("results/ matches the raw runs.")
+        print(f"{where} matches the raw runs.")
         return 0
-    OUT.mkdir(exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     for name, text in outputs.items():
-        (OUT / name).write_text(text)
+        (out / name).write_text(text)
     print(md)
+    print(f"Wrote {where}")
     return 0
 
 
