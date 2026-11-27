@@ -1,8 +1,8 @@
 # agent-latency-trace
 
-**Your agent feels slow, and the usual advice (a smaller model, a shorter prompt) does not say
-where the seconds go. This repo times a real agent one model call at a time, so you can see
-it, and every number here can be checked from the raw logs without an API key.**
+**Your agent feels slow, and the usual advice (a smaller model, a shorter prompt) does not
+tell you where the seconds go. This repo times a real agent one model call at a time. You
+can check every number from the raw logs, with no API key.**
 
 It runs a small coding agent on OpenAI's Responses API. The agent fixes a broken checkout
 function with 3 tools: read a file, edit a file, run the tests. For each model call it records
@@ -19,7 +19,7 @@ Companion to the article *Why Is Your AI Agent So Slow?*, to be published soon o
 
 ## What it found
 
-GPT-6.2 Sol, 10 runs at medium effort and 10 at xhigh, run one after the other on
+GPT-6.2 Sol, 10 runs at medium effort and 10 at xhigh, taking turns run by run, on
 26 November 2026 from one laptop over the public API. Every run passed the tests. Medians,
 with 95 percent bootstrap intervals in brackets. The 3 share rows are totals over the 10
 runs.
@@ -46,10 +46,11 @@ third of that wait was thinking, by the estimate in point 3. For a task made of 
 steps, cut the number of calls. Ask the model for independent tool calls in one step, as
 this agent's system prompt does.
 
-**2. More effort made the task slower, even with fewer calls.** At xhigh the model planned one
-bigger edit and finished in 4 calls instead of 5, but it was slower in all 10 paired runs, by
-2.0 s at the median (0.8 to 2.6). At medium it did not think at all on this task. Raise the
-effort only where a measured gain in passed tasks pays for the seconds.
+**2. More effort made the task slower, even with fewer calls.** At xhigh the model planned
+one bigger edit and finished in 4 calls instead of 5, but it was slower in all 10 paired
+runs, by 2.0 s at the median (0.8 to 2.6). At medium it did not think at all on this task.
+Raise the effort only where it makes more tasks pass. Here every run passed at both
+levels.
 
 **3. Thinking is hidden inside the wait, and it was slower per token than writing.** The
 API sends no thinking text and no start time for it. Each reasoning token added about
@@ -57,11 +58,11 @@ API sends no thinking text and no start time for it. Each reasoning token added 
 usage data. That is about 66 tokens a second (60 to 72), against about 95 to 100 for
 visible writing. Only 10 calls had any reasoning, so treat that number as rough.
 
-**4. Where the system prompt goes decides whether it is cached.** The first pilot sent it in the
-top-level `instructions` field and got 0 cached tokens on every call. OpenAI's prompt caching
-guide says GPT-6.2 models place `instructions` after the input, past the part the cache covers.
-Sent as the first `developer` message instead, 92 to 99 percent of the input after the first
-call came from the cache.
+**4. The system prompt was cached only when it went first in the input.** The first pilot
+sent it in the top-level `instructions` field and got 0 cached tokens on every call.
+OpenAI's prompt caching guide says GPT-6.2 models place `instructions` after the input,
+past the part the cache covers. With the system prompt as the first `developer` message
+instead, 92 to 99 percent of the input after the first call came from the cache.
 
 **5. The tools took almost no time.** Reading a file, editing it and running the tests took
 milliseconds. Real tools that call a network or a database will take a bigger share.
@@ -93,9 +94,9 @@ cd agent-latency-trace
 make check
 ```
 
-`make check` runs the tests and recomputes every number in `results/` from the raw logs. It
-fails if any of them would change. It needs Python 3.9 or later and nothing else, and it is
-what the CI job runs on every push.
+`make check` runs the tests and recomputes every number in `results/` from the raw logs.
+It fails if any of them would change. It needs Python 3.9 or later and nothing else. The
+CI job runs the same 2 steps on every push to main and on every pull request.
 
 ## Run it yourself
 
@@ -120,9 +121,10 @@ tokens. The defaults are GPT-6.2 Sol's.
 A second task, `--task billing`, has date bugs to fix. In the pilot the model used no
 reasoning tokens on it at medium or high effort.
 
-On macOS the tests run under `sandbox-exec`, with the network blocked and writes allowed only
-inside the run's own temporary folder, because the code under test is code the model wrote.
-On other systems they run without that sandbox.
+On macOS the tests run under `sandbox-exec`, with the network blocked and writes allowed
+only inside the run's own temporary folder, because the code under test is code the model
+wrote. On other systems they run with no sandbox, so run the script inside a container or
+a throwaway virtual machine.
 
 ## Files
 
@@ -134,7 +136,7 @@ On other systems they run without that sandbox.
 | `prompts/` | the system prompt and the task prompts, exactly as they were sent |
 | `data/raw/` | one JSON line per run: every event time, the usage data, the tool times |
 | `data/pilot/` | the pilot runs that shaped the design, kept for the record |
-| `results/` | the summary and the median trace for each effort level, generated |
+| `results/` | the summary, and the trace of one middle run for each effort level, generated |
 | `tests/` | offline tests, including one that checks `results/` against `data/raw/` |
 
 The logs keep the time and size of every streamed piece but none of the text the model wrote.

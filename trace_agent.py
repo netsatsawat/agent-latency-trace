@@ -41,10 +41,10 @@ CACHE_KEY = "agent-latency-trace"
 MAX_CALLS = 10
 TEST_TIMEOUT_S = 60
 
-# Prices in US dollars per million tokens, used only for the spending cap. The defaults
-# are gpt-6.2-sol's standard rates from OpenAI's model page on 2026-11-26. Uncached
-# input is charged at the cache-write rate, the higher of the two, so the running total
-# errs on the high side.
+# Prices in US dollars per million tokens, for the spending cap and each run's cost
+# estimate. The defaults are gpt-6.2-sol's standard rates from OpenAI's model page on
+# 2026-11-26. Uncached input is charged at the cache-write rate, the higher of the two,
+# so the running total comes out a little high, never low.
 DEFAULT_MODEL = "gpt-6.2-sol"
 DEFAULT_PRICES = {"input": 2.50, "cached": 0.10, "output": 10.00}
 
@@ -279,8 +279,7 @@ def run_agent(
 
     total = round(time.perf_counter() - t_run, 4)
     conn.close()
-    # Success is checked here by running the tests again, not taken from the model's
-    # reply.
+    # Run the tests again to decide success. The model's reply does not count.
     passed, _ = run_tests(workdir)
     shutil.rmtree(workdir, ignore_errors=True)
     return {
@@ -337,8 +336,8 @@ def main(argv=None) -> int:
     out = args.out or ROOT / "data" / "raw" / f"{stamp}-{args.model}-{args.task}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    # Alternate the effort levels run by run, so a slow spell on the API hits both
-    # alike.
+    # Alternate the effort levels run by run, so a slow period on the API affects both
+    # effort levels equally.
     plan = [(i, e) for i in range(1, args.runs + 1) for e in args.efforts]
     spent = 0.0
     for i, effort in plan:

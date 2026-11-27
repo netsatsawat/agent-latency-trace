@@ -4,9 +4,9 @@
     python3 analyze.py FILE [...]  # reads only these run files
     python3 analyze.py --check     # fails if results/ no longer matches the raw runs
 
-Every number in the README and the article comes from this file, so anyone can check it
-from the raw logs without calling the API again. It needs Python 3.9 or later and
-nothing else.
+Every number in results/ comes from this file. The README and the article quote the
+numbers measured in the 20 runs, so anyone can check them from the raw logs without
+calling the API again. It needs Python 3.9 or later and nothing else.
 
 All the runs it reads must share one task and one model. It refuses a mix. A call that
 hit an API error, or ended with no visible output, is left out of the per-call numbers.
@@ -313,8 +313,8 @@ def analyse(raw_files: list) -> tuple[dict, dict, str]:
     for effort in efforts:
         ms = [m for m in metrics if m["effort"] == effort]
         summary["by_effort"][effort] = effort_summary(ms, rng)
-        # The run with the median task time goes to the GIF. With an even number of runs
-        # it is the lower of the two middle ones.
+        # The lower of the two middle runs by task time goes to the GIF. With an odd
+        # number of runs it is the middle one.
         ordered = sorted(ms, key=lambda m: m["total_s"])
         traces[effort] = trace(ordered[(len(ordered) - 1) // 2], base_wait)
     if len(efforts) == 2:
