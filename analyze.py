@@ -78,13 +78,12 @@ def call_metrics(call: dict) -> dict | None:
         return None
     first = min(delta_times + shown)
     last = max(delta_times + done + [first])
-    created = next(t for t, kind, _ in events if kind == "response.created")
     completed = next((t for t, kind, _ in events if kind in FINAL_EVENTS), last)
     span = last - first
     speed = visible / span if visible >= MIN_VISIBLE and span >= MIN_SPAN else None
     return {
-        "step": call["step"], "sent_s": call["sent_s"], "created_s": created,
-        "first_token_s": first, "last_token_s": last, "completed_s": completed,
+        "step": call["step"], "sent_s": call["sent_s"], "first_token_s": first,
+        "last_token_s": last, "completed_s": completed,
         "input_tokens": usage.get("input_tokens", 0), "cached_tokens": cached,
         "output_tokens": out_tokens, "reasoning_tokens": reasoning,
         "visible_tokens": visible, "writing_speed": speed, "tools": call["tool_calls"],
@@ -154,10 +153,10 @@ def trace(run: dict, base_wait: float) -> dict:
     """Lay one run out as segments for the GIF: the wait, thinking, writing and tools.
 
     The thinking segment is an estimate. The API sends the reasoning item only once the
-    thinking is over, so the stream gives no start time for it. A call that thought is
-    taken to have waited `base_wait` like any other call, plus its thinking, so the
-    thinking is the extra wait. `base_wait` is the intercept of the fit in
-    thinking_fit(): the usual wait for the first token when the model does not think.
+    thinking is over, so the stream gives no start time for it. A call with reasoning
+    tokens is taken to have waited `base_wait` like any other call, plus its thinking.
+    The thinking is the extra wait. `base_wait` is the intercept of the fit in
+    thinking_fit(): the usual wait for the first token on a call with no reasoning tokens.
     With no fit, it is the median wait of the calls after the first.
     Dividing reasoning tokens by the writing speed would undercount it here, because
     thinking ran slower per token than writing.
@@ -194,6 +193,14 @@ def effort_summary(ms: list, rng: random.Random) -> dict:
     later = [c for c in calls if c["step"] > 1]
     first_calls = [c["first_token_s"] for c in calls if c["step"] == 1]
     later_input = sum(c["input_tokens"] for c in later)
+    task_time = sum(m["total_s"] for m in ms)
+    shares = {
+        k: sum(m[k] for m in ms) / task_time
+        for k in ("waiting_for_first_token_s", "writing_s", "tools_s")
+    }
+    # The rest of the task time: the end of each stream after its last token, and the
+    # script's own work between calls and tools.
+    shares["other_s"] = 1 - sum(shares.values())
     return {
         "runs": len(ms), "succeeded": sum(m["success"] for m in ms),
         "task_time_s": median_ci([m["total_s"] for m in ms], rng),
@@ -207,10 +214,7 @@ def effort_summary(ms: list, rng: random.Random) -> dict:
             round(sum(c["cached_tokens"] for c in later) / later_input, 3)
             if later_input else None
         ),
-        "share_of_task_time": {
-            k: round(sum(m[k] for m in ms) / sum(m["total_s"] for m in ms), 3)
-            for k in ("waiting_for_first_token_s", "writing_s", "tools_s")
-        },
+        "share_of_task_time": {k: round(v, 3) for k, v in shares.items()},
         "cost_usd_per_run": round(statistics.median(m["cost_usd"] for m in ms), 5),
     }
 
@@ -272,9 +276,16 @@ def load_runs(raw_files: list) -> list:
     """
     runs = []
     for f in raw_files:
-        for line in f.read_text().splitlines():
-            if line.strip():
-                runs.append(dict(json.loads(line), source=display_path(f)))
+        for n, line in enumerate(f.read_text().splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                run = json.loads(line)
+            except json.JSONDecodeError:
+                raise RunFileError(
+                    f"{display_path(f)}, line {n}: not valid JSON. Was the run cut off?"
+                ) from None
+            runs.append(dict(run, source=display_path(f)))
     if not runs:
         raise RunFileError("The run files hold no runs.")
     for key in ("task", "model", "prices_per_mtok"):
@@ -287,11 +298,17 @@ def load_runs(raw_files: list) -> list:
     return runs
 
 
-def analyse(raw_files: list) -> tuple[dict, dict, str]:
+def summarize(raw_files: list) -> tuple[dict, dict, str]:
+    """Read the run files and return the summary, the traces and the summary as text."""
     runs = load_runs(raw_files)
     meta = {k: runs[0].get(k) for k in ("task", "model", "prices_per_mtok")}
     rng = random.Random(SEED)
     metrics = [run_metrics(r) for r in runs]
+    if not any(m["call_metrics"] for m in metrics):
+        raise RunFileError(
+            "No call in these runs could be timed. Every call hit an API error or ended "
+            "with no visible output. See the error field in the run file."
+        )
     order = [m["effort"] for m in metrics]
     efforts = sorted(set(order), key=order.index)
     summary = {
@@ -307,7 +324,7 @@ def analyse(raw_files: list) -> tuple[dict, dict, str]:
     if fit is not None:
         base_wait = fit["intercept_s"]
     else:
-        # No call after the first thought, so their usual wait is just the median.
+        # No call after the first had reasoning tokens, so the usual wait is the median.
         base_wait = statistics.median([c["first_token_s"] for c in later] or [0.0])
     traces = {}
     for effort in efforts:
@@ -346,10 +363,17 @@ def analyse(raw_files: list) -> tuple[dict, dict, str]:
 
 
 def render_md(s: dict) -> str:
-    def ci(d, unit=""):
+    def num(x, digits=None):
+        """x rounded to `digits` places, or as it is when `digits` is None."""
+        return f"{x:g}" if digits is None else f"{x:.{digits}f}"
+
+    def ci(d, unit="", digits=None):
         if d["median"] is None:
             return "n/a"
-        return f"{d['median']:g}{unit} ({d['lo']:g} to {d['hi']:g})"
+        return (
+            f"{num(d['median'], digits)}{unit} "
+            f"({num(d['lo'], digits)} to {num(d['hi'], digits)})"
+        )
 
     def percent(x, fmt=".0%"):
         return "n/a" if x is None else format(x, fmt)
@@ -357,30 +381,34 @@ def render_md(s: dict) -> str:
     def pct(e, key, fmt=".0%"):
         return percent(e["share_of_task_time"][key], fmt)
 
+    def speed(x):
+        return "n/a" if x is None else num(x, 0)
+
     sources = ", ".join(f"`{f}`" for f in s["source_files"])
     lines = [
         f"# Results: {s['model']}, task `{s['task']}`, {s['runs']} runs",
         "",
         "Medians with 95 percent bootstrap intervals in brackets. The share rows and the "
-        "cache hit rate are totals over the runs, not medians. Generated by analyze.py "
-        f"from {sources}. Do not edit by hand.",
+        "cache hit rate are totals over all the runs. Seconds have 2 decimal places and "
+        f"speeds are whole tokens a second. analyze.py wrote this file from {sources}. "
+        "Do not edit it by hand.",
         "",
         "| | " + " | ".join(s["by_effort"]) + " |",
         "|---|" + "---|" * len(s["by_effort"]),
     ]
     rows = [
         ("runs that passed the tests", lambda e: f"{e['succeeded']} of {e['runs']}"),
-        ("task time", lambda e: ci(e["task_time_s"], " s")),
+        ("task time", lambda e: ci(e["task_time_s"], " s", 2)),
         ("model calls per task", lambda e: ci(e["model_calls"])),
         (
             "wait for first token, per call",
-            lambda e: ci(e["first_token_s_per_call"], " s"),
+            lambda e: ci(e["first_token_s_per_call"], " s", 2),
         ),
         (
             "wait for first token, first call",
-            lambda e: ci(e["first_token_s_first_call"], " s"),
+            lambda e: ci(e["first_token_s_first_call"], " s", 2),
         ),
-        ("writing speed", lambda e: ci(e["writing_speed_tok_s"], " tokens/s")),
+        ("writing speed", lambda e: ci(e["writing_speed_tok_s"], " tokens/s", 0)),
         ("reasoning tokens per task", lambda e: ci(e["reasoning_tokens_per_run"])),
         ("visible tokens per task", lambda e: ci(e["visible_tokens_per_run"])),
         (
@@ -390,6 +418,10 @@ def render_md(s: dict) -> str:
         ("time waiting for first tokens", lambda e: pct(e, "waiting_for_first_token_s")),
         ("time writing", lambda e: pct(e, "writing_s")),
         ("time in tools", lambda e: pct(e, "tools_s", ".1%")),
+        (
+            "other time: the end of each stream and the script",
+            lambda e: pct(e, "other_s", ".1%"),
+        ),
         ("cost per task (estimate)", lambda e: f"${e['cost_usd_per_run']:.4f}"),
     ]
     for label, fn in rows:
@@ -400,7 +432,7 @@ def render_md(s: dict) -> str:
         slower = [k for k in p if k.startswith("pairs_where")][0]
         lines += [
             "", f"Paired by run number in the same file, {p['difference']}: "
-            f"{ci(p, ' s')}. {p[slower]} of {p['n']} pairs were slower at the higher "
+            f"{ci(p, ' s', 2)}. {p[slower]} of {p['n']} pairs were slower at the higher "
             "effort.",
         ]
     a = s["all_runs"]
@@ -418,17 +450,18 @@ def render_md(s: dict) -> str:
     f = s["first_token_vs_reasoning_tokens"]
     if f is None:
         lines += [
-            "", "No calls after the first had reasoning tokens, so there is no thinking "
-            "fit.",
+            "", "No calls after the first had reasoning tokens. Hence there is no "
+            "thinking fit.",
         ]
     else:
         lines += [
             "", f"Wait for the first token against reasoning tokens, {f['n']} calls "
-            f"after the first: {f['intercept_s']} s plus {f['s_per_token'] * 1000:.2f} "
-            f"ms per reasoning token, which is about {f['implied_thinking_speed_tok_s']} "
-            f"reasoning tokens per second ({f['implied_speed_lo']} to "
-            f"{f['implied_speed_hi']}). Only {f['calls_with_reasoning']} of those calls "
-            "had any reasoning tokens.",
+            f"after the first: {num(f['intercept_s'], 2)} s plus "
+            f"{f['s_per_token'] * 1000:.2f} ms per reasoning token. The thinking speed "
+            f"comes out at about {speed(f['implied_thinking_speed_tok_s'])} reasoning "
+            f"tokens a second ({speed(f['implied_speed_lo'])} to "
+            f"{speed(f['implied_speed_hi'])}). "
+            f"Only {f['calls_with_reasoning']} of those calls had any reasoning tokens.",
         ]
     return "\n".join(lines) + "\n"
 
@@ -441,19 +474,23 @@ def main(argv=None) -> int:
         ".jsonl file in data/raw/)"
     )
     ap.add_argument(
-        "--check", action="store_true", help="fail if results/ is out of date"
+        "--check", action="store_true",
+        help="exit 1 if results/ no longer matches data/raw/"
     )
     args = ap.parse_args(argv)
     raw_files = args.files or sorted(RAW.glob("*.jsonl"))
     if not raw_files:
-        print("No runs in data/raw/ yet. Run trace_agent.py first.", file=sys.stderr)
+        print(
+            "No run files in data/raw/. To read your own runs, pass their files, such as "
+            "out/runs/<your file>.", file=sys.stderr
+        )
         return 2
     missing = [str(f) for f in raw_files if not f.is_file()]
     if missing:
         print("No such file: " + ", ".join(missing), file=sys.stderr)
         return 2
     try:
-        summary, traces, md = analyse(raw_files)
+        summary, traces, md = summarize(raw_files)
     except RunFileError as err:
         print(err, file=sys.stderr)
         return 2

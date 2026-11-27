@@ -2,12 +2,13 @@
 .PHONY: check analyze run
 
 check:
+	python3 --version
 	python3 -m unittest discover -s tests -v
 	python3 analyze.py --check
 
 analyze:
 	python3 analyze.py
 
-# make run writes a new file in data/raw/ and prints the analyze.py command for it alone.
+# make run writes a new file in out/runs/ and prints the analyze.py command for it.
 run:
 	python3 trace_agent.py --task checkout --model gpt-6.2-sol --efforts medium xhigh --runs 10 --max-cost 5

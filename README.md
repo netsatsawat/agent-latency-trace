@@ -1,5 +1,7 @@
 # agent-latency-trace
 
+[![reproduce](https://github.com/netsatsawat/agent-latency-trace/actions/workflows/reproduce.yml/badge.svg?branch=main)](https://github.com/netsatsawat/agent-latency-trace/actions/workflows/reproduce.yml)
+
 **I built this to see where the time goes when an AI agent works on a task. The script
 runs a small coding agent and times every model call and every tool. All the raw logs are
 in this repo. You can check each number below without an API key.**
@@ -32,7 +34,8 @@ The table shows the median of each number. For task time, the numbers in bracket
 95 percent bootstrap interval. We resampled the 10 runs 5,000 times and took the median
 each time. The middle 95 percent of those medians fall in that range. For the 3 share rows,
 we added up each kind of time over all 10 runs and divided it by the total task time of
-those runs.
+those runs. The other 1 to 2 percent went to the end of each stream and to the script
+itself.
 
 | | medium | xhigh |
 |---|---|---|
@@ -54,8 +57,8 @@ no thinking, the first token came back after about 1.1 s. The agent made 4 to 6 
 task. In each call, the model wrote between 14 and 398 visible tokens, the tokens you see
 in the reply. Hence waiting for first tokens took about 60 percent of the task time,
 including the thinking. Writing took 37 to 38 percent. At xhigh, thinking took about 2 s
-of the 6.8 s that a task spent waiting for first tokens. The 2 s comes from 137 reasoning
-tokens at about 15 ms each (see point 3).
+of the 6.8 s that a task spent waiting for first tokens, on average. The 2 s comes from 137
+reasoning tokens at about 15 ms each (see point 3).
 
 If your agent's task has many short steps, cut the calls that only fetch something. Each
 one you cut saves a wait of about 1 s here. For example, ask the model to read files that
@@ -92,10 +95,11 @@ after the input on GPT-6.2 models. The cache only covers the start of the input,
 the prefix, when it is 1,024 tokens or longer. Our input without the system prompt was
 shorter than that.
 
-Then we moved the system prompt to the start of the input, as a `developer` message. From
-then on, almost all of the input came from the cache, the first call included (1,484 of
-1,487 tokens). Over all the calls after the first, 99 percent of the input came from the
-cache at medium and 92 percent at xhigh. The lowest single calls came right after the edit
+Then we moved the system prompt to the start of the input, as a `developer` message. In
+the 20 runs, over all the calls after the first, 99 percent of the input came from the cache
+at medium and 92 percent at xhigh. The input of the first call came from the cache too
+(1,484 of 1,487 tokens). In the 4 checkout pilot runs just after the move, the first call
+got no cached tokens. We do not know why. The lowest single calls came right after the edit
 at xhigh, at 77 to 80 percent. Their input held the long edit the model had just written,
 which no earlier call had sent.
 
@@ -134,15 +138,15 @@ make check
 
 `make check` runs the tests. Then it works out every number in `results/` again from the
 raw logs and compares them with the files in `results/`. If any number comes out different,
-the check fails. You only need Python 3.9 or later. Our CI job runs the same 2 steps on
-every pull request and every push to main.
+the check fails. You only need Python 3.9 or later. Our CI job runs `make check` on Python
+3.9 and 3.14, on every pull request and every push to main.
 
 ## Run it yourself
 
 ```bash
 export OPENAI_API_KEY=...
 python3 trace_agent.py --task checkout --model gpt-6.2-sol --efforts medium xhigh --runs 10 --max-cost 5
-python3 analyze.py data/raw/<your file>
+python3 analyze.py out/runs/<your file>
 ```
 
 Our 20 runs cost about $0.14 at list prices and took about 3.5 minutes. The `--max-cost`
@@ -151,10 +155,10 @@ can go over the cap by the cost of 1 call. Your numbers will differ with the mod
 effort level, the time of day and where you run from. So time your own agent first, then
 decide what to change.
 
-Each time you run `trace_agent.py`, it writes a new file in `data/raw/`. By default,
-`analyze.py` reads every file in that folder. To keep your runs apart from our 20, pass your
-own file, as in the last line above. `analyze.py` then writes the tables to
-`out/<your file>/` and does not touch the committed `results/`.
+Each time you run `trace_agent.py`, it writes a new file in `out/runs/`, which git ignores.
+With no file names, `analyze.py` reads only our 20 runs in `data/raw/`. Hence `make check`
+still passes after you run the script. To see the numbers for your runs, pass your file, as
+in the last line above. `analyze.py` then writes the tables to `out/<your file>/`.
 
 The default prices are GPT-6.2 Sol's, in US dollars per million tokens: $2.50 for uncached
 input, $0.10 for cached input and $10 for output. The $2.50 is Sol's 30-minute cache-write
@@ -169,8 +173,9 @@ xhigh.
 
 The tests run code that the model wrote. On macOS, the script runs the tests under
 `sandbox-exec`. The sandbox blocks the network and allows writes only inside the run's own
-temporary folder. On other systems, the script runs the tests with no sandbox. Run it there
-inside a container or a virtual machine you can delete afterwards.
+temporary folder. On other systems, the script stops unless you pass `--no-sandbox`. Pass
+it only inside a container or a virtual machine you can delete afterwards. On every system,
+the script keeps `OPENAI_API_KEY` out of the tests' environment.
 
 ## Files
 
@@ -180,10 +185,10 @@ inside a container or a virtual machine you can delete afterwards.
 | [analyze.py](analyze.py) | turns the raw runs into `results/`, with `--check` for CI |
 | `tasks/checkout/`, `tasks/billing/` | the small projects the agent fixes, as we ran them |
 | `prompts/` | the system prompt and the task prompts, as we sent them |
-| `data/raw/` | one JSON line per run: every event time, the usage data, the tool times |
+| `data/raw/` | one JSON line per run: every event time, the usage data, the tool times. see [data/README.md](data/README.md) for every field |
 | `data/pilot/` | the pilot runs, from before the changes listed below |
 | `results/` | the summary, and the trace of one middle run for each effort level |
-| `tests/` | offline tests, including one that checks `results/` against `data/raw/` |
+| `tests/` | offline tests for both scripts, run by `make check` |
 
 The script saves the time and size of every streamed event. It does not save any text the
 model wrote.
@@ -194,11 +199,12 @@ We changed 3 things after the pilot runs. Their logs are in `data/pilot/` if you
 check.
 
 1. In the first pilot, we used an earlier version of the checkout task that had only one
-   bug. We put the system prompt in `instructions`, and no call got a cache hit. Point 4
-   above gives the 2 reasons. Now we send the system prompt first in the input, as a
-   developer message. We also set a fixed `prompt_cache_key`. OpenAI's guide says GPT-5.6
-   and later models do not need it for cache hits, so the hits came from moving the system
-   prompt.
+   bug. The task prompt still has the words "Find the bug" from that version. We sent it
+   that way in all 20 runs. Also in the first pilot, we put the system prompt in
+   `instructions`, and no call got a cache hit. We give the 2 reasons in point 4 above.
+   Now we send the system prompt first in the input, as a developer message. We also set a
+   fixed `prompt_cache_key`. According to OpenAI's prompt caching guide, GPT-5.6 and later
+   models do not need it for cache hits. Hence the hits came from moving the system prompt.
 2. Our first version opened a new connection for every call. Now the script keeps one
    connection per run, as an SDK client does.
 3. On the checkout task, the model wrote no reasoning tokens in 1 pilot run each at low,

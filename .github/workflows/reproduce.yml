@@ -1,27 +1,31 @@
 name: reproduce
 
-# Recomputes every number in results/ from the raw runs in data/raw/ and fails if any of them
-# changed. It never calls the API, so it needs no key and costs nothing.
-# Pushes to main and pull requests only, so each push to a PR branch starts a single run.
+# This job works out every number in results/ again from the raw runs in data/raw/. If any
+# number changed, the job fails. The job never calls the API and needs no key.
 on:
   push:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   reproduce:
     # Pinned: ubuntu-latest (26.04) has no Python 3.9 build, and the scripts support 3.9.
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.9", "3.12"]
+        python: ["3.9", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
-      - name: Tests
-        run: python -m unittest discover -s tests -v
-      - name: Results match the raw runs
-        run: python analyze.py --check
+      - run: make check

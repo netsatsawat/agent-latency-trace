@@ -60,7 +60,8 @@
    "share_of_task_time": {
     "waiting_for_first_token_s": 0.609,
     "writing_s": 0.368,
-    "tools_s": 0.006
+    "tools_s": 0.006,
+    "other_s": 0.017
    },
    "cost_usd_per_run": 0.00492
   },
@@ -113,7 +114,8 @@
    "share_of_task_time": {
     "waiting_for_first_token_s": 0.602,
     "writing_s": 0.381,
-    "tools_s": 0.005
+    "tools_s": 0.005,
+    "other_s": 0.012
    },
    "cost_usd_per_run": 0.0087
   }
