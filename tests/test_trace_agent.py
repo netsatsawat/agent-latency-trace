@@ -168,14 +168,16 @@ class TestTools(TempProject):
             result = trace_agent.run_tool(self.dir, "read_file", arguments)
             self.assertTrue(result.startswith("Tool error"), result)
 
-    def test_the_tests_never_get_the_api_key(self):
+    def test_the_tests_get_only_4_variables(self):
         done = subprocess.CompletedProcess([], 0, "OK", "")
         run = mock.Mock(return_value=done)
-        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        secrets = {"OPENAI_API_KEY": "test-key", "GITHUB_TOKEN": "test-token"}
+        with mock.patch.dict(os.environ, secrets):
             with mock.patch.object(trace_agent.subprocess, "run", run):
                 passed, _ = trace_agent.run_tests(self.dir, sandbox=False)
         self.assertTrue(passed)
-        self.assertNotIn("OPENAI_API_KEY", run.call_args.kwargs["env"])
+        env = run.call_args.kwargs["env"]
+        self.assertLessEqual(set(env), {"PATH", "HOME", "LANG", "TMPDIR"})
 
 
 class TestRunAgent(unittest.TestCase):
@@ -260,6 +262,26 @@ class TestMain(unittest.TestCase):
         lines = self.out.read_text().splitlines()
         self.assertEqual(len(lines), 1)
         self.assertEqual(json.loads(lines[0])["calls"][0]["http_status"], 401)
+
+    def test_a_429_with_no_credit_stops_the_batch(self):
+        no_credit = mock.Mock(side_effect=trace_agent.APIError(
+            429, '{"error": {"code": "credit_balance_exhausted"}}'
+        ))
+        no_tests = mock.Mock(return_value=(False, ""))
+        with mock.patch.multiple(trace_agent, stream_call=no_credit, run_tests=no_tests):
+            code = self.main("--runs", "3", "--no-sandbox", "--out", str(self.out))
+        self.assertEqual(code, 1)
+        self.assertEqual(len(self.out.read_text().splitlines()), 1)
+
+    def test_a_rate_limit_429_does_not_stop_the_batch(self):
+        busy = mock.Mock(side_effect=trace_agent.APIError(
+            429, '{"error": {"code": "rate_limit_exceeded"}}'
+        ))
+        no_tests = mock.Mock(return_value=(False, ""))
+        with mock.patch.multiple(trace_agent, stream_call=busy, run_tests=no_tests):
+            code = self.main("--runs", "3", "--no-sandbox", "--out", str(self.out))
+        self.assertEqual(code, 0)
+        self.assertEqual(len(self.out.read_text().splitlines()), 6)
 
 
 if __name__ == "__main__":
