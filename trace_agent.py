@@ -41,6 +41,12 @@ API_HOST, API_PATH = "api.openai.com", "/v1/responses"
 # A fixed key keeps this experiment's cache use apart from other calls. According to
 # OpenAI's prompt caching guide, GPT-5.6 and later models do not need it for cache hits.
 CACHE_KEY = "agent-latency-trace"
+# According to OpenAI's error-codes guide, retrying these 429 errors does not restore
+# access, so the script stops the batch on them.
+BILLING_429 = (
+    "insufficient_quota", "credit_balance_exhausted", "spend_limit_exceeded",
+    "usage_limit_exceeded",
+)
 # A run that needs more model calls than this stops and counts as failed.
 MAX_CALLS = 10
 TEST_TIMEOUT_S = 60
@@ -116,8 +122,11 @@ def run_tests(workdir: Path, sandbox: bool = True) -> tuple[bool, str]:
             f'(allow file-write* (subpath "{workdir.resolve()}") (literal "/dev/null"))'
         )
         cmd = ["sandbox-exec", "-p", profile] + cmd
-    # The tests run code the model wrote. We keep the API key out of their environment.
-    env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
+    # The tests run code the model wrote, and their output goes back to the model. We pass
+    # them only these 4 variables, so no key or token from the shell can reach them.
+    env = {
+        k: os.environ[k] for k in ("PATH", "HOME", "LANG", "TMPDIR") if k in os.environ
+    }
     try:
         done = subprocess.run(
             cmd, cwd=workdir, env=env, capture_output=True, text=True,
@@ -186,7 +195,7 @@ def stream_call(conn: http.client.HTTPSConnection, payload: dict, api_key: str) 
     # According to OpenAI's API reference, x-request-id is the request's unique ID for
     # troubleshooting, and openai-processing-ms is the time OpenAI took to process the
     # request. We keep both as text, as the API sent them.
-    headers = {
+    ids = {
         "request_id": resp.getheader("x-request-id"),
         "processing_ms": resp.getheader("openai-processing-ms"),
     }
@@ -219,7 +228,7 @@ def stream_call(conn: http.client.HTTPSConnection, payload: dict, api_key: str) 
     return {
         "events": events, "deltas": deltas, "status": final.get("status"),
         "usage": final.get("usage") or {}, "output": final.get("output") or [],
-        **headers,
+        **ids,
     }
 
 
@@ -454,7 +463,9 @@ def main(argv=None) -> int:
             last = run["calls"][-1]
             reason = last.get("error", f"The response ended as {last.get('status')}.")
             print("  " + reason[:300], file=sys.stderr)
-            no_credit = last.get("http_status") == 429 and "insufficient_quota" in reason
+            no_credit = (
+                last.get("http_status") == 429 and any(c in reason for c in BILLING_429)
+            )
             if last.get("http_status") in (400, 401, 403, 404) or no_credit:
                 # A bad key, a bad model name or an account with no credit fails every
                 # run in the same way.

@@ -261,6 +261,26 @@ class TestMain(unittest.TestCase):
         self.assertEqual(len(lines), 1)
         self.assertEqual(json.loads(lines[0])["calls"][0]["http_status"], 401)
 
+    def test_a_429_with_no_credit_stops_the_batch(self):
+        no_credit = mock.Mock(side_effect=trace_agent.APIError(
+            429, '{"error": {"code": "credit_balance_exhausted"}}'
+        ))
+        no_tests = mock.Mock(return_value=(False, ""))
+        with mock.patch.multiple(trace_agent, stream_call=no_credit, run_tests=no_tests):
+            code = self.main("--runs", "3", "--no-sandbox", "--out", str(self.out))
+        self.assertEqual(code, 1)
+        self.assertEqual(len(self.out.read_text().splitlines()), 1)
+
+    def test_a_rate_limit_429_does_not_stop_the_batch(self):
+        busy = mock.Mock(side_effect=trace_agent.APIError(
+            429, '{"error": {"code": "rate_limit_exceeded"}}'
+        ))
+        no_tests = mock.Mock(return_value=(False, ""))
+        with mock.patch.multiple(trace_agent, stream_call=busy, run_tests=no_tests):
+            code = self.main("--runs", "3", "--no-sandbox", "--out", str(self.out))
+        self.assertEqual(code, 0)
+        self.assertEqual(len(self.out.read_text().splitlines()), 6)
+
 
 if __name__ == "__main__":
     unittest.main()

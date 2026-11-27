@@ -15,8 +15,8 @@ before its visible reply. The API reports how many there were but does not send 
 worked out every measured number below from these logs, in `data/raw/` for the 20 runs
 and in `data/pilot/` for the pilot.
 
-This repo goes with my article *Why Is Your AI Agent So Slow?*. The article will be on
-[Medium](https://medium.com/@net_satsawat) soon.
+This repo goes with my article *Why Is Your AI Agent So Slow?* on
+[Medium](https://medium.com/@net_satsawat).
 
 ![One agent task drawn as a trace: You, Model and Tool lanes on a time axis](docs/trace.gif)
 
@@ -175,7 +175,8 @@ The tests run code that the model wrote. On macOS, the script runs the tests und
 `sandbox-exec`. The sandbox blocks the network and allows writes only inside the run's own
 temporary folder. On other systems, the script stops unless you pass `--no-sandbox`. Pass
 it only inside a container or a virtual machine you can delete afterwards. On every system,
-the script keeps `OPENAI_API_KEY` out of the tests' environment.
+the tests get only 4 environment variables from your shell: `PATH`, `HOME`, `LANG` and
+`TMPDIR`. Your API key and any other tokens stay out of their reach.
 
 ## Files
 
@@ -185,7 +186,7 @@ the script keeps `OPENAI_API_KEY` out of the tests' environment.
 | [analyze.py](analyze.py) | turns the raw runs into `results/`, with `--check` for CI |
 | `tasks/checkout/`, `tasks/billing/` | the small projects the agent fixes, as we ran them |
 | `prompts/` | the system prompt and the task prompts, as we sent them |
-| `data/raw/` | one JSON line per run: every event time, the usage data, the tool times. see [data/README.md](data/README.md) for every field |
+| `data/raw/` | one JSON line per run: every event time, the usage data, the tool times. See [data/README.md](data/README.md) for every field |
 | `data/pilot/` | the pilot runs, from before the changes listed below |
 | `results/` | the summary, and the trace of one middle run for each effort level |
 | `tests/` | offline tests for both scripts, run by `make check` |
