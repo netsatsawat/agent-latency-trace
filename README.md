@@ -1,14 +1,15 @@
 # agent-latency-trace
 
-**Your agent feels slow, and the usual advice (a smaller model, a shorter prompt) does not
-tell you where the seconds go. This repo times a real agent one model call at a time. You
-can check every number from the raw logs, with no API key.**
+**When your agent is slow, the usual advice is to use a smaller model or a shorter prompt.
+Before you try either, find out what takes the time. This repo times every model call a real
+agent makes. You can check each number from the raw logs without an API key.**
 
 It runs a small coding agent on OpenAI's Responses API. The agent fixes 3 broken functions
-in a small checkout module. It has 3 tools: read a file, edit a file, run the tests. For each model call it records
-when every streamed event arrived, how many tokens the model read, thought and wrote, how much
-of the prompt came from the cache, and how long each tool took. The data behind every table
-below is in `data/raw/`, and `make check` rebuilds the tables from it.
+in a small checkout module. It has 3 tools: read a file, edit a file, run the tests. For
+each model call it records when every streamed event arrived and how long each tool took.
+It also keeps the token counts the API returns: input, cached input, reasoning and output
+tokens. The data behind every table below is in `data/raw/`, and `make check` rebuilds the
+tables from it.
 
 Companion to the article *Why Is Your AI Agent So Slow?*, to be published soon on
 [Medium](https://medium.com/@net_satsawat).
@@ -39,18 +40,18 @@ runs.
 The full table, generated from the logs, is [results/summary.md](results/summary.md).
 
 **1. Most of the time went to waiting for each call's first token.** A call with no
-thinking waited about 1.1 s before anything came back, and a task made 4 to 6 calls. Each
-call then wrote only 14 to 398 visible tokens, so the waits outweighed the writing: about
-60 percent of the task, thinking included, against about 40 for writing. At xhigh, about a
-third of that wait was thinking, by the estimate in point 3. For a task made of short
-steps, cut the number of calls. Ask the model for independent tool calls in one step, as
-this agent's system prompt does.
+thinking waited about 1.1 s before anything came back, and a task made 4 to 6 calls. After
+the wait, the model wrote only 14 to 398 visible tokens per call. So waiting, thinking
+included, took about 60 percent of the task. Writing took about 40 percent. At xhigh, about a
+third of that wait was thinking, by the estimate in point 3. If your agent's task is made of
+short steps, cut the number of calls. This agent's system prompt does it by asking the model
+to make independent tool calls in one step.
 
-**2. More effort made the task slower, even with fewer calls.** At xhigh the model planned
-one bigger edit and finished in 4 calls instead of 5, but it was slower in all 10 paired
-runs, by 2.0 s at the median (0.8 to 2.6). At medium it did not think at all on this task.
-Raise the effort only where it makes more tasks pass. Here every run passed at both
-levels.
+**2. More effort made the task slower, even with fewer calls.** At xhigh the model made one
+bigger edit and finished in 4 calls instead of 5. The task still took longer in all 10
+paired runs, by 2.0 s at the median (0.8 to 2.6). At medium, the model wrote no reasoning
+tokens on this task. Every run passed at both levels. Raise the effort only where it makes
+more tasks pass.
 
 **3. Thinking is hidden inside the wait, and it was slower per token than writing.** The
 API sends no thinking text and no start time for it. Each reasoning token added about
@@ -61,25 +62,26 @@ visible writing. Only 10 calls had any reasoning, so treat that number as rough.
 **4. The system prompt was cached only when it went first in the input.** The first pilot
 sent it in the top-level `instructions` field and got 0 cached tokens on every call.
 OpenAI's prompt caching guide says GPT-6.2 models place `instructions` after the input,
-past the part the cache covers. With the system prompt as the first `developer` message
-instead, 92 to 99 percent of the input after the first call came from the cache.
+past the part the cache covers. The rest of that prompt was too short to cache on its own:
+OpenAI caches only prefixes of 1,024 tokens or more. When the system prompt went first as a
+`developer` message, 92 to 99 percent of the input after the first call came from the cache.
 
 **5. The tools took almost no time.** Reading a file, editing it and running the tests took
 milliseconds. Real tools that call a network or a database will take a bigger share.
 
 ## What a call's numbers mean
 
-Each call is sent, waits, then streams. The script keeps the time of every event and the
-`usage` block the API returns. [analyze.py](analyze.py) turns those into:
+The script sends each call, waits, then reads the reply as it streams in. It keeps the time
+of every event and the `usage` block the API returns. [analyze.py](analyze.py) turns those into:
 
 - **wait for the first token:** from sending the request to the first visible output, text
   or the start of a tool call. It covers the network, the provider's queue, reading the
   part of the prompt that is not cached, and any hidden thinking. When the model asked for
-  2 tools in one call, both calls arrived in one piece, so their writing counts as wait.
-  By an estimate of 51 tokens at about 98 a second, that adds about 0.5 s to each run's
-  first call, about 5 percent of the task.
-- **reasoning tokens:** `usage.output_tokens_details.reasoning_tokens`. The model thinks before
-  its first visible token, so this time sits inside the wait.
+  2 tools in one call, both tool calls arrived all at once, so the time spent writing them
+  counts as wait. That adds about 0.5 s to the first call of each run, about 5 percent of the
+  task. The 0.5 s is an estimate: 51 tokens at about 98 a second.
+- **reasoning tokens:** `usage.output_tokens_details.reasoning_tokens`. The model produces these
+  tokens before its first visible token, so their time is part of the wait.
 - **writing speed:** visible tokens (output tokens minus reasoning tokens) divided by the time
   from the first visible token to the last. Calls under 20 visible tokens or 0.25 s are too
   short to time and are left out.
@@ -113,7 +115,7 @@ out a little high. Your numbers will differ with the model, the effort, the time
 and where you run from. Time your own agent before you change it.
 
 Each time you run the script, it writes a new file in `data/raw/`. `analyze.py` reads
-every file there, so pass your own file to keep your runs apart from these 20:
+every file there. To keep your runs apart from these 20, pass it your own file:
 `python3 analyze.py data/raw/<your file>`. It writes the tables to `out/<your file>/`,
 so the committed `results/` stay as they are. If you change `--model`, also pass its prices
 with `--price-input`, `--price-cached` and `--price-output`, in US dollars per million
@@ -122,10 +124,10 @@ tokens. The defaults are GPT-6.2 Sol's.
 A second task, `--task billing`, has date bugs to fix. In the pilot the model used no
 reasoning tokens on it at medium or high effort.
 
-On macOS the tests run under `sandbox-exec`, with the network blocked and writes allowed
-only inside the run's own temporary folder, because the code under test is code the model
-wrote. On other systems they run with no sandbox, so run the script inside a container or
-a throwaway virtual machine.
+The code under test is code the model wrote. So on macOS the tests run under `sandbox-exec`,
+with the network blocked and writes allowed only inside the run's own temporary folder. On
+other systems they run with no sandbox, so run the script inside a container or a throwaway
+virtual machine.
 
 ## Files
 
@@ -147,25 +149,27 @@ The logs keep the time and size of every streamed piece but none of the text the
 The pilot runs in `data/pilot/` changed the experiment in 3 ways, and they are kept so you can
 see why.
 
-1. The first pilot, on an earlier one-bug version of the checkout task, put the system prompt in
-   `instructions` and got no cache hits at all. It now goes first in the input as a developer
-   message, with a fixed `prompt_cache_key`.
+1. The first pilot ran an earlier one-bug version of the checkout task. It put the system
+   prompt in `instructions` and got no cache hits at all. The system prompt was never cached
+   there, and the rest of the prompt was under OpenAI's 1,024-token minimum. The system
+   prompt now goes first in the input as a developer message, with a fixed `prompt_cache_key`.
 2. The first version opened a new connection for every call. It now keeps one connection per
    run, as an SDK client would.
 3. On the checkout task the model wrote no reasoning tokens at low, medium or high effort, and
-   none on the billing task at medium or high. At xhigh it thought on the step where it wrote
-   the fix. So the final runs compare medium, the usual setting, with xhigh.
+   none on the billing task at medium or high. At xhigh the model used reasoning tokens on the
+   step where it wrote the fix. So the final runs compare medium, the usual setting, with xhigh.
 
 ## Limits
 
-- One model, one small task and one network location. A bigger task with longer outputs will
-  spend a larger share of its time writing, which is what the article's sources found for
-  coding agents on self-hosted models.
-- 10 runs per effort level. The intervals above say how much that matters for each number.
+- One model, one small task and one network location. On a bigger task with longer outputs,
+  writing will take a larger share of the time. The article's sources found this for coding
+  agents on self-hosted models.
+- 10 runs per effort level. The intervals above show how much that matters for each number.
 - The tools are local and fast. Tools that call a network will change the shares.
 - The thinking time in the GIF is an estimate: the extra wait for the first token over a call
-  that did not think. The API does not report it.
-- Costs are estimates from list prices on 26 November 2026, not from the bill.
+  with no reasoning tokens. The API does not report it.
+- Costs are estimates from list prices on 26 November 2026. They are not taken from what
+  OpenAI charged.
 
 ## License
 
