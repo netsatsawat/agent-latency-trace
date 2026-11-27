@@ -14,7 +14,8 @@ from a fresh copy of the task folder. The tests run code the model wrote. On mac
 run under sandbox-exec, which blocks the network and stops writes outside the run's own
 folder. On other systems the script stops unless you pass --no-sandbox. Pass it only
 inside a container or a virtual machine you can delete afterwards. On every system, the
-tests get only PATH, HOME, LANG and TMPDIR from the environment. They can still read files.
+tests get only PATH, HOME, LANG and TMPDIR from the environment. They can still read
+files.
 
 Every run is one line in out/runs/<date>-<time>-<model>-<task>.jsonl, with the date and
 time in UTC. Each use of the script writes a new file there, and git ignores out/. To
