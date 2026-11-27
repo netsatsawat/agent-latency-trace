@@ -8,6 +8,6 @@ check:
 analyze:
 	python3 analyze.py
 
+# make run writes a new file in data/raw/ and prints the analyze.py command for it alone.
 run:
 	python3 trace_agent.py --task checkout --model gpt-6.2-sol --efforts medium xhigh --runs 10 --max-cost 5
-	python3 analyze.py

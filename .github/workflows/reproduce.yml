@@ -2,14 +2,18 @@ name: reproduce
 
 # Recomputes every number in results/ from the raw runs in data/raw/ and fails if any of them
 # changed. It never calls the API, so it needs no key and costs nothing.
+# Pushes to main and pull requests only, so each push to a PR branch starts a single run.
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
   reproduce:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest (26.04) has no Python 3.9 build, and the scripts support 3.9.
+    runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.9", "3.12"]
     steps:
