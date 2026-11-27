@@ -168,14 +168,16 @@ class TestTools(TempProject):
             result = trace_agent.run_tool(self.dir, "read_file", arguments)
             self.assertTrue(result.startswith("Tool error"), result)
 
-    def test_the_tests_never_get_the_api_key(self):
+    def test_the_tests_get_only_4_variables(self):
         done = subprocess.CompletedProcess([], 0, "OK", "")
         run = mock.Mock(return_value=done)
-        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        secrets = {"OPENAI_API_KEY": "test-key", "GITHUB_TOKEN": "test-token"}
+        with mock.patch.dict(os.environ, secrets):
             with mock.patch.object(trace_agent.subprocess, "run", run):
                 passed, _ = trace_agent.run_tests(self.dir, sandbox=False)
         self.assertTrue(passed)
-        self.assertNotIn("OPENAI_API_KEY", run.call_args.kwargs["env"])
+        env = run.call_args.kwargs["env"]
+        self.assertLessEqual(set(env), {"PATH", "HOME", "LANG", "TMPDIR"})
 
 
 class TestRunAgent(unittest.TestCase):

@@ -14,7 +14,7 @@ from a fresh copy of the task folder. The tests run code the model wrote. On mac
 run under sandbox-exec, which blocks the network and stops writes outside the run's own
 folder. On other systems the script stops unless you pass --no-sandbox. Pass it only
 inside a container or a virtual machine you can delete afterwards. On every system, the
-script keeps OPENAI_API_KEY out of the tests' environment.
+tests get only PATH, HOME, LANG and TMPDIR from the environment. They can still read files.
 
 Every run is one line in out/runs/<date>-<time>-<model>-<task>.jsonl, with the date and
 time in UTC. Each use of the script writes a new file there, and git ignores out/. To
@@ -41,11 +41,12 @@ API_HOST, API_PATH = "api.openai.com", "/v1/responses"
 # A fixed key keeps this experiment's cache use apart from other calls. According to
 # OpenAI's prompt caching guide, GPT-5.6 and later models do not need it for cache hits.
 CACHE_KEY = "agent-latency-trace"
-# According to OpenAI's error-codes guide, retrying these 429 errors does not restore
-# access, so the script stops the batch on them.
+# According to OpenAI's error-codes guide, a retry does not fix these 429 errors. Their
+# error type can also be insufficient_quota. The script stops the batch on any of them.
 BILLING_429 = (
-    "insufficient_quota", "credit_balance_exhausted", "spend_limit_exceeded",
-    "usage_limit_exceeded",
+    "insufficient_quota", "credit_balance_exhausted",
+    "organization_spend_limit_exceeded", "project_spend_limit_exceeded",
+    "organization_usage_limit_exceeded",
 )
 # A run that needs more model calls than this stops and counts as failed.
 MAX_CALLS = 10
@@ -123,7 +124,7 @@ def run_tests(workdir: Path, sandbox: bool = True) -> tuple[bool, str]:
         )
         cmd = ["sandbox-exec", "-p", profile] + cmd
     # The tests run code the model wrote, and their output goes back to the model. We pass
-    # them only these 4 variables, so no key or token from the shell can reach them.
+    # them only these 4 variables, so they cannot see a key or token in the environment.
     env = {
         k: os.environ[k] for k in ("PATH", "HOME", "LANG", "TMPDIR") if k in os.environ
     }
