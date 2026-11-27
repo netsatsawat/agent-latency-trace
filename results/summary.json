@@ -1,6 +1,6 @@
 {
  "source_files": [
-  "2026-11-26-gpt-6.2-sol-checkout.jsonl"
+  "data/raw/2026-11-26-gpt-6.2-sol-checkout.jsonl"
  ],
  "task": "checkout",
  "model": "gpt-6.2-sol",
@@ -125,6 +125,9 @@
   "lo": 0.829,
   "hi": 2.587,
   "pairs_where_xhigh_was_slower": 10
+ },
+ "all_runs": {
+  "calls_left_out": 0
  },
  "first_token_vs_reasoning_tokens": {
   "n": 68,

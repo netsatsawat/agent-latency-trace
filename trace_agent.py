@@ -13,8 +13,9 @@ It needs Python 3.9 or later and nothing outside the standard library. Each run 
 from a fresh copy of the task folder. On macOS the tests run under sandbox-exec, which
 blocks the network and stops writes outside the run's own folder, because the code under
 test is code the model wrote. Every run is one line in
-data/raw/<date>-<model>-<task>.jsonl, and analyze.py turns those lines into the numbers
-in results/.
+data/raw/<date>-<time>-<model>-<task>.jsonl, with the date and time in UTC, so each use
+of the script writes a new file. analyze.py turns those lines into the numbers in
+results/.
 """
 from __future__ import annotations
 
@@ -44,6 +45,7 @@ TEST_TIMEOUT_S = 60
 # are gpt-6.2-sol's standard rates from OpenAI's model page on 2026-11-26. Uncached
 # input is charged at the cache-write rate, the higher of the two, so the running total
 # errs on the high side.
+DEFAULT_MODEL = "gpt-6.2-sol"
 DEFAULT_PRICES = {"input": 2.50, "cached": 0.10, "output": 10.00}
 
 FILE_NAME = {"type": "string", "description": "A file name, such as prices.py."}
@@ -295,26 +297,44 @@ def main(argv=None) -> int:
     tasks = sorted(p.name for p in (ROOT / "tasks").iterdir())
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--task", default="checkout", choices=tasks)
-    ap.add_argument("--model", default="gpt-6.2-sol")
+    ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--efforts", nargs="+", default=["medium", "xhigh"])
     ap.add_argument("--runs", type=int, default=10, help="runs per effort level")
-    ap.add_argument("--max-cost", type=float, default=5.0, help="stop before this (USD)")
-    ap.add_argument("--price-input", type=float, default=DEFAULT_PRICES["input"])
-    ap.add_argument("--price-cached", type=float, default=DEFAULT_PRICES["cached"])
-    ap.add_argument("--price-output", type=float, default=DEFAULT_PRICES["output"])
+    ap.add_argument(
+        "--max-cost", type=float, default=5.0,
+        help="spending cap in US dollars, checked before each model call"
+    )
+    ap.add_argument(
+        "--price-input", type=float, help="US dollars per million uncached input tokens"
+    )
+    ap.add_argument(
+        "--price-cached", type=float, help="US dollars per million cached input tokens"
+    )
+    ap.add_argument(
+        "--price-output", type=float, help="US dollars per million output tokens"
+    )
     ap.add_argument("--out", type=Path, default=None, help="JSONL file to append runs to")
     args = ap.parse_args(argv)
 
+    given = {
+        "input": args.price_input, "cached": args.price_cached,
+        "output": args.price_output,
+    }
+    if args.model != DEFAULT_MODEL and all(v is None for v in given.values()):
+        print(
+            f"The default prices are for {DEFAULT_MODEL}. For {args.model}, pass "
+            "--price-input, --price-cached and --price-output, in US dollars per "
+            "million tokens.", file=sys.stderr
+        )
+        return 2
+    prices = {k: DEFAULT_PRICES[k] if v is None else v for k, v in given.items()}
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         print("Set OPENAI_API_KEY first.", file=sys.stderr)
         return 2
-    prices = {
-        "input": args.price_input, "cached": args.price_cached,
-        "output": args.price_output,
-    }
-    today = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
-    out = args.out or ROOT / "data" / "raw" / f"{today}-{args.model}-{args.task}.jsonl"
+    # A new file for each use of the script, so a second batch never appends to the first.
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d-%H%M%S")
+    out = args.out or ROOT / "data" / "raw" / f"{stamp}-{args.model}-{args.task}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
 
     # Alternate the effort levels run by run, so a slow spell on the API hits both
@@ -341,6 +361,7 @@ def main(argv=None) -> int:
             f"  (total ${spent:.3f})"
         )
     print(f"Wrote {out}. Spent about ${spent:.3f}.")
+    print(f"To see the numbers for these runs alone: python3 analyze.py {out}")
     return 0
 
 

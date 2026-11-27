@@ -96,14 +96,23 @@ what the CI job runs on every push.
 ```bash
 export OPENAI_API_KEY=...
 python3 trace_agent.py --task checkout --model gpt-6.2-sol --efforts medium xhigh --runs 10 --max-cost 5
-python3 analyze.py
+python3 analyze.py data/raw/<your file>
 ```
 
-The 20 runs above cost about $0.14 by list prices and took about 4 minutes. The script stops
-before the `--max-cost` cap, which it counts with the uncached input priced at the cache-write
-rate, so its total errs on the high side. Your numbers will differ with the model, the effort,
-the time of day and where you run from, which is the point: time your own agent before you
-change it. A second task, `--task billing`, has date bugs that need more reasoning.
+The 20 runs above cost about $0.14 by list prices and took about 3.5 minutes. The script
+checks the `--max-cost` cap before each model call, so it can go over by the cost of one
+call. It prices uncached input at the higher cache-write rate, so its running total comes
+out a little high. Your numbers will differ with the model, the effort, the time of day
+and where you run from. Time your own agent before you change it.
+
+Each time you run the script, it writes a new file in `data/raw/`. `analyze.py` reads
+every file there, so pass your own file to keep your runs apart from these 20:
+`python3 analyze.py data/raw/<your file>`. If you change `--model`, also pass its prices
+with `--price-input`, `--price-cached` and `--price-output`, in US dollars per million
+tokens. The defaults are GPT-6.2 Sol's.
+
+A second task, `--task billing`, has date bugs to fix. In the pilot the model used no
+reasoning tokens on it at medium or high effort.
 
 On macOS the tests run under `sandbox-exec`, with the network blocked and writes allowed only
 inside the run's own temporary folder, because the code under test is code the model wrote.
