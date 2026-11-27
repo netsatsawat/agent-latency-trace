@@ -35,16 +35,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 API_HOST, API_PATH = "api.openai.com", "/v1/responses"
-# The same key on every call routes the calls to the same cache.
+# A fixed key keeps this experiment's cache use apart from other calls. OpenAI's guide
+# says GPT-5.6 and later models get cache hits without it.
 CACHE_KEY = "agent-latency-trace"
 # A run that needs more model calls than this stops and counts as failed.
 MAX_CALLS = 10
 TEST_TIMEOUT_S = 60
 
 # Prices in US dollars per million tokens, for the spending cap and each run's cost
-# estimate. The defaults are gpt-6.2-sol's standard rates from OpenAI's model page on
-# 2026-11-26. Uncached input is charged at the cache-write rate, the higher of the two,
-# so the running total comes out a little high, never low.
+# estimate. The defaults are gpt-6.2-sol's prices from OpenAI's pricing page on
+# 2026-11-26. For uncached input we use its 30-minute cache-write price of $2.50, which is
+# above its $2.00 input price, so the running total comes out a little high, never low.
 DEFAULT_MODEL = "gpt-6.2-sol"
 DEFAULT_PRICES = {"input": 2.50, "cached": 0.10, "output": 10.00}
 
